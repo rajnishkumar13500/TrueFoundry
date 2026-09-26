@@ -1,35 +1,14 @@
 # 🛡️ ActionShield — System Architecture & Flow Diagrams
 
-This document contains the exact Mermaid diagrams reflecting the real ActionShield implementation on TrueForge and the 11 registered MCP tools.
+This document contains the complete, updated system architecture, end-to-end execution flow, and sequence diagrams reflecting developer-safe GitOps workflow.
 
----
-
-## 🎯 The Actual Verified Flow
-
-The system executes in a clear, sensible order:
-
-1. **Step 1: Baseline Diagnosis First (Inspect Existing Service)**
-   - The agent inspects live telemetry (`get_service_metrics`) and tables/indexes (`get_database_schema`).
-   - It measures the baseline under load (`run_load_test`), discovering the **2,340 ms latency spike** and sequential table scan.
-   - It queries **Case Memory** (`search_historical_cases`) for matching symptom signatures.
-2. **Step 2: Interactive Diagnostic Report & Consent**
-   - The agent reports the baseline findings to the operator using TrueForge's native `ask_user_question`:
-     *"I identified the bottleneck: orders queries take 2,340ms due to a missing composite index. Should I create an isolated sandbox environment to test the fix?"*
-3. **Step 3: Sandbox Isolation & Deep Testing of the Fix**
-   - Once the issue is identified and confirmed, the agent enters an isolated sandbox environment.
-   - Formalizes an **Action Contract** (`validate_action_contract`) specifying scope and rollback.
-   - Applies candidate migration (`run_migration`) in the sandbox.
-   - Runs Triumvirate Reviewers (`evaluate_evidence_and_reviewers`):
-     - **Attempt 1 Fails Safely**: The Red Team flags standard `CREATE INDEX` as a table-locking hazard (`ACCESS EXCLUSIVE`).
-     - **Adaptive Replanning**: Agent rewrites migration to `CREATE INDEX CONCURRENTLY` and provides rollback (`rollback_migration`).
-     - **Attempt 2 Passes**: Re-benchmarking proves latency drops from **2,340 ms to 0.054 ms** (-99.8%). All reviewers sign off.
-4. **Step 4: TrueForge Human Checkpoint Gate**
-   - The agent attempts `apply_production_fix`.
-   - TrueForge's native policy engine intercepts this tool and **halts execution** (`tool.approval_required`).
-   - The operator reviews the diff and approves deployment in the TrueForge UI.
-5. **Step 5: Production Execution & Memory Persistence**
-   - The fix is executed on production (`apply_production_fix`).
-   - The verified resolution trajectory is stored in Case Memory (`store_incident_case`).
+### 💡 Core Mission & GitOps Philosophy
+- **Zero Blind Production Mutation**: ActionShield **never** forces direct changes to `main` or touches production databases directly.
+- **Deep Sandbox Testing**: Commits are tested inside an isolated Daytona Sandbox replica seeded with 50,000 realistic records.
+- **Detailed Issue Summary**: Presents exact metrics, affected files, query execution plans, and expected failure modes.
+- **Safe Branching & Re-testing**: If the developer asks for a fix, the agent creates a **new dedicated Git branch** (e.g. `fix/orders-index-optimization`), applies the fix, and **re-tests inside the sandbox**.
+- **Developer in Control**: ActionShield delivers a fully verified branch with evidence so the engineering team can review and merge to `main` manually.
+- **Repo-Specific Learning**: ActionShield stores all findings and verified fixes in repository-specific Case Memory, getting smarter as the codebase evolves.
 
 ---
 
@@ -37,45 +16,45 @@ The system executes in a clear, sensible order:
 
 ```mermaid
 graph TB
-    subgraph PresentationLayer["1. Presentation & Interaction"]
-        Operator["Human Operator / Jury"]
+    subgraph DevLayer["1. Developer & Presentation Layer"]
+        Developer["Developer / Operator"]
         Dashboard["ActionShield Mission Dashboard<br>(http://localhost:3000)"]
-        TargetApp["Target Orders App & Test UI<br>(http://localhost:8000)"]
+        GitHubRepo["GitHub Repository: trufoundary-demo<br>(Branches: main, fix/orders-index-optimization)"]
     end
 
     subgraph TrueForgeLayer["2. TrueForge Platform Runtime (Port 8790)"]
         TFStudio["TrueForge Agent Studio / Chat UI"]
         TFOrchestrator["TrueForge Orchestrator & Session Manager"]
-        TFPolicyEngine["TrueForge Policy Gate<br>(tool.approval_required for apply_production_fix)"]
+        TFPolicyEngine["TrueForge Policy Gate<br>(Tool Approval Checkpoints)"]
         TFAgent["ActionShield Agent<br>(OpenAI GPT-5.5)"]
     end
 
-    subgraph MCPLayer["3. ActionShield MCP Server (Port 8791 & Cloudflare Tunnel)"]
+    subgraph MCPLayer["3. ActionShield MCP Server (Port 8791 & Cloudflare)"]
         MCPEndpoint["MCP Server HTTP/SSE App<br>(/mcp)"]
-        subgraph ToolRegistry["11 Registered MCP Tools"]
-            T_Diag["get_service_metrics<br>get_database_schema<br>run_load_test"]
-            T_Mem["search_historical_cases<br>store_incident_case"]
-            T_Contract["validate_action_contract<br>check_intent_vs_reality"]
-            T_Review["evaluate_evidence_and_reviewers"]
-            T_Migrate["run_migration<br>rollback_migration"]
-            T_Prod["apply_production_fix<br>(Gated by TrueForge Approval)"]
+        subgraph ToolRegistry["Registered MCP Tools"]
+            T_Sand["setup_sandbox_replica<br>seed_sandbox_database"]
+            T_Bench["run_sandbox_benchmark<br>profile_query_plan"]
+            T_Rev["run_performance_agent<br>run_reliability_agent<br>run_red_team_agent"]
+            T_Prompt["ask_user_decision"]
+            T_Branch["create_fix_branch<br>apply_sandbox_fix"]
+            T_Mem["query_repo_memory<br>store_repo_memory"]
         end
     end
 
-    subgraph SandboxLayer["4. Isolated Testing Environment"]
-        SandboxEnv["Daytona Sandbox Container / Isolated Branch"]
-        SandboxDB["Isolated Database Instance"]
-        LoadRunner["Concurrent Load Runner & Query Profiler"]
+    subgraph DaytonaLayer["4. Daytona Cloud Sandbox (Isolated Replica)"]
+        SandboxContainer["Isolated Daytona Linux Container"]
+        SandboxApp["Target Orders API Instance"]
+        SandboxDB["Seeded SQLite/Postgres DB (50k rows)"]
+        SandboxProfiler["EXPLAIN ANALYZE & Concurrency Load Generator"]
     end
 
-    subgraph StorageLayer["5. Persistent Storage"]
-        CaseMemoryFile["Case Memory Store<br>(data/case_memory.json)"]
-        ProductionDB["Production Database & GitHub Repo"]
+    subgraph MemoryLayer["5. Repository-Specific Learning Store"]
+        RepoMemoryDB["Repo Case Memory<br>(data/case_memory.json keyed by repo_id)"]
     end
 
-    Operator -->|Prompts & Approvals| TFStudio
-    Operator -->|Monitors Telemetry| Dashboard
-    Operator -->|Tests Query Latency| TargetApp
+    Developer -->|Trigger & Decision| TFStudio
+    Developer -->|View Telemetry| Dashboard
+    GitHubRepo -->|Source Cloned into Sandbox| SandboxContainer
 
     TFStudio --> TFOrchestrator
     TFOrchestrator --> TFAgent
@@ -83,153 +62,146 @@ graph TB
     TFAgent -->|JSON-RPC SSE/HTTP| MCPEndpoint
 
     MCPEndpoint --> ToolRegistry
-    T_Diag --> TargetApp
-    T_Mem <--> CaseMemoryFile
-    T_Contract --> SandboxEnv
-    T_Migrate --> SandboxDB
-    T_Review --> LoadRunner
-    T_Prod --> ProductionDB
+    T_Sand --> SandboxContainer
+    SandboxContainer --> SandboxApp
+    SandboxContainer --> SandboxDB
+    T_Bench --> SandboxProfiler
+    T_Rev --> SandboxProfiler
+    T_Branch --> GitHubRepo
+    T_Mem <--> RepoMemoryDB
 ```
 
 ---
 
-## 2. End-to-End Execution Flowchart
+## 2. End-to-End Autonomous Flow: The GitOps 2-Phase Lifecycle
 
 ```mermaid
 flowchart TD
-    Start(["Start: Latency Anomaly Detected in Orders Service"]) --> S1["1. DIAGNOSE: get_service_metrics & get_database_schema"]
+    Start(["Developer Pushes Commit or Requests Pre-Flight Check"]) --> S1["1. Provision Isolated Daytona Sandbox"]
     
-    S1 --> S2["Run Baseline Benchmark: run_load_test"]
-    S2 --> BaseFound["Baseline Found:<br>• p95 Latency = 2,340 ms<br>• Query: SELECT ... ORDER BY created_at DESC<br>• Missing Index: idx_orders_user_created"]
-
-    BaseFound --> S3["Query Memory: search_historical_cases"]
-    S3 --> AskConsent["ask_user_question:<br>'I found the bottleneck: orders queries take 2,340ms due to a missing composite index.<br>Should I create an isolated sandbox environment to test the fix?'"]
-
-    AskConsent --> UserDecision{"Operator in TrueForge"}
-    UserDecision -->|Deny| EndAbort(["Investigation Ended by Operator"])
-
-    UserDecision -->|Approve| S4["2. ENTER SANDBOX: validate_action_contract"]
-    
-    subgraph SandboxExecution["Sandbox Validation & Adaptive Replanning"]
-        S4 --> Scope["Sign Action Contract (Scope: migrations/*.sql only)"]
-        Scope --> Att1["Attempt 1: Apply Candidate Index (run_migration)"]
-        Att1 --> Eval1["evaluate_evidence_and_reviewers (Attempt 1)"]
-        Eval1 --> RedTeamCheck{"Red Team Reviewer Verdict"}
+    subgraph SandboxPhase1["PHASE 1: Deep Sandbox Stress Testing & Diagnosis"]
+        S1 --> Seed["Clone Repo & Seed Sandbox DB with 50,000 Realistic Orders"]
+        Seed --> LaunchApp["Launch Application Service inside Sandbox"]
+        LaunchApp --> MultiAgent["Multi-Agent Testing Layer Dispatched:<br>• Performance Agent: p50/p95 latency & EXPLAIN ANALYZE<br>• DB Reliability Agent: Index coverage & transaction safety<br>• Red Team Agent: Table lock hazards & concurrency contention"]
         
-        RedTeamCheck -->|REJECTED: Table Lock Risk| Adapt["Adaptive Replanning:<br>Rewrite to CREATE INDEX CONCURRENTLY<br>+ Generate Reversible Rollback Script"]
-        Adapt --> Att2["Attempt 2: Apply Non-Blocking Migration (run_migration)"]
-        Att2 --> Eval2["evaluate_evidence_and_reviewers (Attempt 2)"]
-        Eval2 --> CheckPassed{"All Reviewers PASS?"}
-        CheckPassed -->|Yes| Validated["Validated Evidence:<br>• p95 drops to 0.054 ms (-99.8%)<br>• Reversible rollback verified<br>• Zero table locks"]
+        MultiAgent --> MetricsCaptured["Diagnostic Findings Captured:<br>• p95 Latency: 2,340 ms (Fails &lt;700ms SLO)<br>• Query: Full table scan on orders(user_id, created_at)<br>• Affected File: app/routes/orders.py<br>• Risk: High lock contention under production traffic"]
     end
 
-    Validated --> S5{"3. HUMAN CHECKPOINT<br>Agent invokes apply_production_fix"}
-    S5 -->|TrueForge Intercept| TFHalt["TrueForge halts with tool.approval_required<br>Displays diff & sandbox benchmark evidence"]
+    MetricsCaptured --> S2["2. Present Issue Summary to Developer"]
+    S2 --> SummaryReport["Detailed Summary Delivered via TrueForge:<br>• Issue Seen: 2,340ms latency bottleneck<br>• Root Cause: Missing composite index<br>• Expected Hazard: Table locks under load<br>• Affected Files: app/routes/orders.py, schema"]
 
-    TFHalt --> OperatorSignoff{"Operator Authorizes Fix?"}
-    OperatorSignoff -->|Deny| Replan(["Action Denied — Rollback Sandbox"])
+    SummaryReport --> AskFix["ask_user_decision:<br>'Would you like me to create a fix branch (fix/orders-index-optimization)<br>and test the proposed fix in the sandbox?'"]
+
+    AskFix --> UserDecision{"Developer Decision in TrueForge"}
     
-    OperatorSignoff -->|Approve| S6["4. EXECUTE: apply_production_fix"]
-    S6 --> Deploy["Deploy fix to production environment"]
-    Deploy --> S7["5. PERSIST: store_incident_case"]
-    S7 --> Finish(["Incident Resolved & Permanently Memorized"])
+    UserDecision -->|Inspect Only| ManualFix(["Developer Fixes Manually — Sandbox Cleaned Up"])
+    
+    UserDecision -->|Create Fix Branch & Test| S3["3. Branch Creation & Sandbox Verification"]
+
+    subgraph SandboxPhase2["PHASE 2: Branch Creation & Re-Testing in Sandbox"]
+        S3 --> GitBranch["Create New Git Branch: fix/orders-index-optimization"]
+        GitBranch --> QueryMem["Query Repo Memory for Past Solutions"]
+        QueryMem --> AdaptFix["Generate Candidate Non-Blocking Fix:<br>CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_user_created<br>+ Reversible Rollback Script"]
+        
+        AdaptFix --> ApplySand["Apply Fix in Sandbox Database"]
+        ApplySand --> ReTest["Re-run Benchmark inside Sandbox:<br>• Latency drops from 2,340ms ➔ 0.054ms (-99.8%)<br>• Red Team confirms zero table locks<br>• Reliability Agent confirms rollback works"]
+    end
+
+    ReTest --> S4["4. Push Fix Branch & Evidence Report"]
+    S4 --> PushGit["Commit & Push fix/orders-index-optimization to GitHub<br>(Production main is NOT touched)"]
+    
+    PushGit --> S5["5. Store Repository-Specific Memory"]
+    S5 --> Learn["Persist Trajectory to Repo Memory:<br>• repo_id: trufoundary-demo<br>• Symptoms & Query Signature<br>• Validated Migration Fix & Metrics"]
+    
+    Learn --> Ready(["Branch Ready for Developer to Review & Merge Manually!"])
 ```
 
 ---
 
-## 3. Sequence Diagram with Exact Tool Calls
+## 3. Sequence Diagram with Exact Tool Interactions
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Operator as Human Operator
+    actor Dev as Developer / Operator
     participant TF as TrueForge Studio (8790)
     participant Agent as ActionShield Agent (GPT-5.5)
     participant MCP as ActionShield MCP Server (8791)
-    participant Sandbox as Isolated Sandbox / DB
-    participant LiveApp as Target App (8000)
+    participant Sandbox as Daytona Sandbox (Isolated)
+    participant GitHub as GitHub Repo (trufoundary-demo)
 
-    Note over Operator,LiveApp: Phase 1: Investigation & Baseline Diagnosis (Inspect First)
-    Operator->>TF: "Diagnose orders query latency in demo-app and propose a validated fix."
-    TF->>Agent: Start Session Turn 1
+    Note over Dev,GitHub: Phase 1: Deep Sandbox Testing & Diagnostic Summary
+    Dev->>TF: "Run pre-flight check on https://github.com/rajnishkumar13500/trufoundary-demo.git"
+    TF->>Agent: Turn 1: Initiate Deep Pre-Flight Verification
 
-    Agent->>MCP: call: get_service_metrics()
-    MCP->>LiveApp: GET /metrics
-    LiveApp-->>MCP: { latency_p95_ms: 2340.0, throughput_rps: 14.2 }
-    MCP-->>Agent: Returns live telemetry snapshot
+    Agent->>MCP: call: setup_sandbox_replica(repo_url="...", commit="HEAD")
+    MCP->>Sandbox: Provision container & clone repo
+    Sandbox-->>MCP: { sandbox_id: "sbx_001", status: "READY" }
+    MCP-->>Agent: Sandbox initialized
 
-    Agent->>MCP: call: get_database_schema(db_path="demo-app/orders.db")
-    MCP-->>Agent: { tables: ["orders"], indexes: ["pk_orders"], has_orders_user_created_index: false }
+    Agent->>MCP: call: seed_sandbox_database(sandbox_id="sbx_001", rows=50000)
+    MCP->>Sandbox: Insert 50k orders + items into sandbox DB
+    Sandbox-->>MCP: { seeded_rows: 50000 }
+    MCP-->>Agent: Database seeded
 
-    Agent->>MCP: call: run_load_test(total_requests=50, concurrency=5)
-    MCP->>LiveApp: 50 concurrent requests to /orders?user_id=X
-    LiveApp-->>MCP: Latencies recorded
-    MCP-->>Agent: { p50_latency_ms: 780.0, p95_latency_ms: 2340.0, errors: 0 }
+    Agent->>MCP: call: run_sandbox_benchmark(sandbox_id="sbx_001", concurrency=5)
+    MCP->>Sandbox: Execute load against orders query
+    Sandbox-->>MCP: { p50_ms: 780.0, p95_ms: 2340.0, scan_type: "SEQUENTIAL_SCAN" }
+    MCP-->>Agent: Benchmark metrics returned
 
-    Agent->>MCP: call: search_historical_cases(symptoms=["orders_latency", "slow_query"])
-    MCP-->>Agent: { matching_cases: [{ id: "case_001", root_cause: "missing composite index" }] }
+    Agent->>MCP: call: run_red_team_agent(sandbox_id="sbx_001")
+    MCP->>Sandbox: Inspect schema locks and unindexed query contention
+    Sandbox-->>MCP: { risk: "HIGH", failure_mode: "Table locks under concurrent writes" }
+    MCP-->>Agent: Reviewer findings returned
 
-    Note over Agent,TF: Interactive Consent Prompt
-    Agent->>TF: call: ask_user_question(question="Baseline p95 is 2,340ms (missing composite index). Should I test the fix in a sandbox environment?")
-    TF-->>Operator: Displays interactive prompt with baseline metrics
+    Note over Agent,TF: Issue Summary & Developer Decision
+    Agent->>TF: Deliver Diagnostic Summary:<br>• Issue Seen: 2,340ms latency (Sequential Scan)<br>• Expected Issue: DB lock contention under concurrency<br>• Affected File: app/routes/orders.py<br>• Prompt: "Create fix branch fix/orders-index-optimization and test in sandbox?"
+    TF-->>Dev: Displays Diagnostic Report & Choice
 
-    Operator->>TF: Reply: "Yes, please test and validate the fix in the sandbox."
-    TF->>Agent: Turn 2 with Operator Consent
+    Note over Dev,GitHub: Phase 2: Create Fix Branch & Re-Test in Sandbox (No Direct Merge to Main!)
+    Dev->>TF: Reply: "Yes, please create the branch and test the fix in the sandbox."
+    TF->>Agent: Turn 2: Authorization to create branch and test
 
-    Note over Agent,Sandbox: Phase 2: Sandbox Testing & Adaptive Replanning
-    Agent->>MCP: call: validate_action_contract(goal="Reduce latency", proposed_change="Add index", allowed_scope=["migrations/*.sql"], rollback_strategy="DROP INDEX")
-    MCP-->>Agent: { status: "VALID", contract: {...} }
+    Agent->>MCP: call: create_fix_branch(repo_url="...", branch_name="fix/orders-index-optimization")
+    MCP->>GitHub: Create and checkout branch fix/orders-index-optimization
+    GitHub-->>MCP: { branch_created: "fix/orders-index-optimization" }
+    MCP-->>Agent: Branch ready
 
-    Note over Agent,Sandbox: Attempt 1: Standard Index (Fails Red Team)
-    Agent->>MCP: call: run_migration(sql_content="CREATE INDEX idx_orders_user_created ON orders(user_id, created_at DESC);")
-    MCP->>Sandbox: Execute SQL in sandbox DB
-    Sandbox-->>MCP: Applied
-    MCP-->>Agent: { status: "SUCCESS" }
+    Agent->>MCP: call: apply_sandbox_fix(sandbox_id="sbx_001", sql="CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_user_created ON orders(user_id, created_at DESC);")
+    MCP->>Sandbox: Apply non-blocking migration in sandbox
+    Sandbox-->>MCP: { applied: true }
+    MCP-->>Agent: Fix applied in sandbox
 
-    Agent->>MCP: call: evaluate_evidence_and_reviewers(git_diff="CREATE INDEX ...", attempt=1)
-    MCP-->>Agent: { overall_status: "FAIL", reviewers: [{ name: "Red Team", status: "FAIL", criticism: "Table lock risk on production Postgres" }] }
+    Agent->>MCP: call: run_sandbox_benchmark(sandbox_id="sbx_001")
+    MCP->>Sandbox: Re-run benchmark workload on sandbox
+    Sandbox-->>MCP: { p95_ms: 0.054, improvement_pct: 99.8, scan_type: "INDEX_SCAN" }
+    MCP-->>Agent: Re-test verified: 0.054ms!
 
-    Note over Agent,Sandbox: Adaptive Replanning -> Attempt 2: Non-Blocking Index
-    Agent->>Agent: Ingest Red Team critique & adapt SQL to CONCURRENTLY
-    Agent->>MCP: call: run_migration(sql_content="CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_user_created ON orders(user_id, created_at DESC);")
-    MCP->>Sandbox: Execute non-blocking migration in sandbox
-    Sandbox-->>MCP: Applied
-    MCP-->>Agent: { status: "SUCCESS" }
+    Agent->>MCP: call: push_branch_commit(branch_name="fix/orders-index-optimization", message="fix(db): add non-blocking composite index idx_orders_user_created")
+    MCP->>GitHub: Push branch to origin/fix/orders-index-optimization
+    GitHub-->>MCP: { pushed: true, commit_sha: "a7d9e1" }
+    MCP-->>Agent: Branch pushed to GitHub
 
-    Agent->>MCP: call: evaluate_evidence_and_reviewers(git_diff="CREATE INDEX CONCURRENTLY ...", attempt=2, after_p95_ms=0.054)
-    MCP-->>Agent: { overall_status: "PASS", recommendation: "Ready for Human Approval" }
+    Note over Agent,MCP: Phase 3: Repository-Specific Learning
+    Agent->>MCP: call: store_repo_memory(repo_id="trufoundary-demo", issue="orders_latency", fix="CONCURRENT_INDEX", before_p95=2340.0, after_p95=0.054)
+    MCP-->>Agent: { memory_stored: true, repo_id: "trufoundary-demo" }
 
-    Note over Agent,TF: Phase 3: TrueForge Human Approval Checkpoint
-    Agent->>TF: Attempt tool call: apply_production_fix(incident_id="inc_001", plan_summary="Add concurrent index", validated_git_diff="...", rollback_command="...")
-    TF->>TF: Check policy: require_approval_for_tools contains "apply_production_fix"
-    TF-->>Operator: ⚠️ HALT: tool.approval_required (Prompt: Authorize production deployment?)
-
-    Operator->>TF: Click "Approve & Execute"
-    TF->>MCP: Authorized execution of apply_production_fix(...)
-    MCP-->>Agent: { status: "EXECUTED", verification: "Operating within SLA (<700ms)" }
-
-    Note over Agent,MCP: Phase 4: Persist in Memory
-    Agent->>MCP: call: store_incident_case(incident="Orders API Latency", symptoms=["orders_latency"], root_cause="missing composite index", before_p95_ms=2340.0, after_p95_ms=0.054)
-    MCP-->>Agent: { status: "STORED", case_id: "case_20260926_c02e" }
-
-    Agent-->>TF: "Incident resolved. p95 latency reduced from 2,340ms to 0.054ms (-99.8%)."
-    TF-->>Operator: Final verification report displayed
+    Agent-->>TF: "Fix verified in sandbox (2,340ms ➔ 0.054ms). Pushed to branch 'fix/orders-index-optimization'. Ready for your review and manual merge!"
+    TF-->>Dev: Final report with GitHub branch link and sandbox evidence displayed
 ```
 
 ---
 
-## 4. Exact MCP Tool Mapping Reference
+## 4. MCP Tool Mapping Table
 
-| # | MCP Tool Name | Loop Stage | Real Functionality |
-| :--- | :--- | :--- | :--- |
-| **1** | `get_service_metrics` | **Investigate (First)** | Queries `/metrics` endpoint on the target app to pull current p50, p95 latency and error rate. |
-| **2** | `get_database_schema` | **Investigate (First)** | Introspects tables, columns, and indexes to verify whether `idx_orders_user_created` exists. |
-| **3** | `run_load_test` | **Investigate (First)** | Generates concurrent load against `/orders?user_id=X` to measure true baseline latency (2,340 ms). |
-| **4** | `search_historical_cases`| **Remember** | Searches vector/symptom store in `case_memory.json` to find historical resolutions for slow queries. |
-| **5** | `validate_action_contract`| **Reason** | Formalizes the Action Contract, locking down allowed file scope (`migrations/*.sql`) and rollback strategy. |
-| **6** | `check_intent_vs_reality`| **Safety / Guard** | Checks that no files outside the declared scope were modified. |
-| **7** | `run_migration` | **Act (Sandbox)** | Applies the candidate SQL migration inside the isolated sandbox database. |
-| **8** | `rollback_migration` | **Safety / Rollback** | Verifies that the rollback SQL works reversibly if needed. |
-| **9** | `evaluate_evidence_and_reviewers` | **Critique** | Runs the Deterministic Policy Engine and the 3 Reviewers (Performance, DB Safety, Red Team). |
-| **10**| `apply_production_fix` | **Human Checkpoint** | **Gated by TrueForge**: requires human approval click in TrueForge UI before executing. |
-| **11**| `store_incident_case` | **Store** | Persists the full verified trajectory into `case_memory.json` so future incidents resolve in sub-seconds. |
+| Tool Name | Stage | Description |
+| :--- | :--- | :--- |
+| `setup_sandbox_replica` | **Phase 1: Setup** | Clones candidate commit into an isolated Daytona Sandbox container. |
+| `seed_sandbox_database` | **Phase 1: Seeding** | Seeds sandbox database with 50,000 realistic orders to replicate real-world load. |
+| `run_sandbox_benchmark` | **Phase 1: Diagnosis** | Runs concurrent requests inside the sandbox to measure p50/p95 latency and query plan. |
+| `run_red_team_agent` | **Phase 1: Risk Analysis** | Tests for table lock contention (`ACCESS EXCLUSIVE`) and concurrent write hazards. |
+| `create_fix_branch` | **Phase 2: Branching** | Creates a dedicated Git branch (`fix/orders-index-optimization`) on GitHub. |
+| `apply_sandbox_fix` | **Phase 2: Remediation** | Applies non-blocking candidate SQL (`CREATE INDEX CONCURRENTLY`) in sandbox DB. |
+| `push_branch_commit` | **Phase 2: Git Push** | Pushes the verified branch to GitHub for the developer to review and merge manually. |
+| `query_repo_memory` | **Learning** | Retrieves historical issues and solutions specific to this repository. |
+| `store_repo_memory` | **Learning** | Persists verified findings, symptom signatures, and code fixes under the repository ID. |
