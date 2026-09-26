@@ -10,4 +10,5 @@ demo-app/
 # Binary tools & runtime data
 tools/
 data/
+sandboxes/
 

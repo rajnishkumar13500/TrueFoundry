@@ -1,152 +1,260 @@
-# ActionShield 🛡️
+# 🛡️ ActionShield — Autonomous Pre-Flight Testing & Self-Healing Agent on TrueForge
 
-> **TrueForge-Powered Self-Validating Autonomous Engineering Agent**  
-> *"Memory suggests. Simulation verifies. Evidence decides."*
+> **Empirical Pre-Flight Testing Layer for Code & Migrations using TrueForge, Daytona Sandboxes, OpenAI GPT-5.5, and Model Context Protocol (MCP).**
 
-Built for the **TrueFoundry "Agents That Act" Hackathon**.
-
----
-
-## 1. Executive Summary
-
-Most AI engineering demos are brittle chatbots that blindly assume generated code works or rely on mock simulators returning hardcoded values. 
-
-**ActionShield** introduces closed-loop, evidence-driven autonomous engineering using **TrueForge as the runtime backbone**:
-1. **Reaches Real Systems via MCP:** Investigates live telemetry, query plans, and database schemas.
-2. **Runs in Isolated Sandboxes:** Clones repositories and executes code inside **Daytona cloud containers**.
-3. **Measures Real Evidence:** Collects actual latency, query plans, throughput, git diffs, and test exit codes.
-4. **Specialized Reviewers:** Evaluates changes through **Performance**, **Reliability / DB**, and **Red Team** perspectives.
-5. **Enforces Deterministic Policy:** Code-level invariants enforce **Intent vs. Reality** (strict zero-tolerance for out-of-scope edits).
-6. **Adaptive Replanning:** Allows early attempts to fail (e.g. Red Team table-lock risks), learns from feedback, and adapts.
-7. **Native Human Checkpoint:** Automatically halts on consequential actions (`apply_production_fix`) using TrueForge's native `user.tool_approval` mechanism.
-8. **Case Memory:** Stores validated incident trajectories for future hypothesis generation.
+[![TrueForge](https://img.shields.io/badge/Runtime-TrueForge_v0.2.1-6366f1?style=for-the-badge&logo=react)](http://localhost:8790)
+[![Model](https://img.shields.io/badge/Model-OpenAI_GPT--5.5-10b981?style=for-the-badge&logo=openai)](https://openai.com)
+[![Protocol](https://img.shields.io/badge/Protocol-MCP_Streamable_HTTP-06b6d4?style=for-the-badge)](http://localhost:8791/mcp)
+[![Sandboxes](https://img.shields.io/badge/Sandboxes-Daytona_Cloud-f59e0b?style=for-the-badge)](https://daytona.io)
+[![GitOps](https://img.shields.io/badge/Workflow-GitOps_Safe_Branching-8b5cf6?style=for-the-badge&logo=git)](https://github.com/rajnishkumar13500/trufoundary-demo)
 
 ---
 
-## 2. The Core 8-Stage Lifecycle
+## 📌 1. The Problem Statement (In Simple Words)
+
+When software teams write code or modify database queries, traditional CI/CD pipelines run unit tests with **only 4 or 5 fake rows of sample data in memory**. Everything passes and turns green!
 
 ```
-REMEMBER ➔ REASON ➔ ACT ➔ OBSERVE ➔ CRITIQUE ➔ ADAPT ➔ APPROVE ➔ STORE
+[Developer Commits Code] ➔ [Standard CI Runs Tests with 5 Fake Rows] ➔ [Status: PASSED 🟢]
+                                       │
+                                       ▼ (Merged to Production)
+[Production with 50,000 Real Customer Orders] ➔ [FULL TABLE SCAN! Latency Spikes to 2,340ms! Checkout Freezes! 💥]
 ```
 
-```
-       [ USER / INCIDENT ]
-                |
-                v
-     [ TRUEFORGE MAIN AGENT ] (OpenAI GPT-5.5)
-       |                 |
-       +--> Historical   +--> Action Contract
-            Case Memory       (Scope, Invariants, Rollback)
-                |
-                v
-     [ ACTIONSHIELD MCP SERVER ] (11 Tools)
-      (Metrics, Tests, DB, Policy, Memory, Deploy)
-                |
-                v
-     [ DAYTONA CLOUD SANDBOX ]
-      (FastAPI + PostgreSQL + Migrations + Load Test)
-                |
-                v
-     [ REAL EVIDENCE ARTIFACTS ]
-      (Git Diff, Latency p50/p95, DB Query ms, Logs, Test Exit Codes)
-                |
-                v
-   +------------+------------+
-   |            |            |
-[Performance] [Reliability] [Red Team] (Reviewers)
-   |            |            |
-   +------------+------------+
-                |
-                v
-   [ DETERMINISTIC POLICY ENGINE ]
-   (Scope Integrity, Error Budgets, Rollback Verification)
-                |
-                v
-            [ JUDGE ]
-           /         \
-     [ FAIL ]       [ PASS ]
-        |              |
-    [ ADAPT ]          v
-   (Replanning)   [ TRUEFORGE HUMAN CHECKPOINT ] (tool.approval_required)
-        |              |
-        +-------->     v
-                  [ CONTROLLED EXECUTION ]
-                       |
-                       v
-                  [ VERIFICATION ]
-                       |
-                       v
-               [ CASE MEMORY STORE ]
-```
+### The Real-World Blindspot:
+1. **Full Table Scans Under Real Scale**: A query that takes `0.1ms` on 5 rows suddenly takes **2,340 milliseconds** on 50,000 real orders because it scans every single row sequentially.
+2. **Database Table-Locking Outages**: When an engineer or AI tries to add an index with plain `CREATE INDEX`, PostgreSQL acquires an `ACCESS EXCLUSIVE` table lock—blocking all customer writes and knocking out checkout services.
+3. **Unit Tests Cannot Test Runtime Reality**: Synthetic unit tests cannot simulate concurrent traffic, realistic database volumes, or locking contention.
 
 ---
 
-## 3. Verified Live Proof: The Orders API Latency Incident
+## 💡 2. The Solution: ActionShield
 
-In our verified end-to-end run on **TrueForge + Daytona + OpenAI GPT-5.5**, the agent resolved a critical latency spike on `GET /orders?user_id=...`:
+**ActionShield** acts as an **autonomous pre-flight "crash test" layer** for your code before it ever touches production:
 
-### Empirical Evidence
-| Metric | Baseline (Unindexed) | Sandbox Validated (Indexed) | Improvement |
+- **Isolated Sandbox Replication**: Instead of risking live production, ActionShield provisions an isolated **Daytona Sandbox container**.
+- **Realistic 50,000 Order Seeding**: Automatically populates the sandbox with 50,000 realistic orders in under a second.
+- **Deep Empirical Stress Testing**: Analyzes the database query execution plan (`EXPLAIN QUERY PLAN`), measures concurrent latency, and runs adversarial safety checks.
+- **Developer in Full Control (GitOps)**: If a bottleneck is detected, ActionShield creates a **dedicated Git branch** (`fix/orders-index-optimization`), adaptively applies a non-blocking fix (`CREATE INDEX CONCURRENTLY`), re-tests inside the sandbox (proving a **99.9% latency drop**), and pushes the branch to GitHub for the developer to review and merge manually. **Production `main` is never modified automatically.**
+- **Repository-Specific Memory**: Learns and stores every incident trajectory in **Repository Case Memory**, getting faster and smarter with every commit.
+
+---
+
+## 🤖 3. TrueForge Integration & Usage
+
+TrueForge serves as the **core runtime, orchestrator, and security backbone** for ActionShield:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        TRUEFORGE AGENT STUDIO                          │
+│                                                                        │
+│   ┌───────────────────────────┐      ┌─────────────────────────────┐   │
+│   │   OpenAI GPT-5.5 Agent    │◄────►│  Native Checkpoint Policy   │   │
+│   │   (actionshield-agent)    │      │  (tool.approval_required)   │   │
+│   └─────────────┬─────────────┘      └─────────────────────────────┘   │
+│                 │ (Streamable HTTP / SSE JSON-RPC)                     │
+│                 ▼                                                      │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │                 ActionShield MCP Server (:8791)                │   │
+│   │       11 Specialized Pre-Flight, Sandbox & Memory Tools        │   │
+│   └────────────────────────────────────────────────────────────────┘   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                ┌───────────────────┴───────────────────┐
+                ▼                                       ▼
+    ┌────────────────────────┐              ┌────────────────────────┐
+    │ Daytona Cloud Sandbox  │              │  Persistent Case DB    │
+    │ (Isolated Environment) │              │  (data/case_memory)    │
+    └────────────────────────┘              └────────────────────────┘
+```
+
+### How ActionShield Leverages TrueForge:
+1. **Agent Orchestration**: `actionshield-agent` runs on TrueForge, leveraging **OpenAI GPT-5.5** for high-precision autonomous planning.
+2. **Model Context Protocol (MCP)**: Registered as a first-class streamable HTTP MCP server (`http://localhost:8791/mcp`) accepting JSON-RPC tool calls.
+3. **Native Human Checkpoint Gate**: Consequential tools like `apply_production_fix` trigger TrueForge's native `tool.approval_required` policy, halting execution until explicit human authorization is granted.
+4. **Context & Compaction Management**: Leverages TrueForge session history, tool streaming, and reactive message handling.
+
+---
+
+## 🔌 4. The 11 Registered ActionShield MCP Tools
+
+| # | MCP Tool Name | Loop Phase | Exact Purpose |
 | :--- | :--- | :--- | :--- |
-| **Query Execution Plan** | `SCAN orders` + `TEMP B-TREE SORT` | `SEARCH orders USING INDEX idx_orders_user_created` | Direct index seek |
-| **p95 Request Latency** | `2,340 ms` | `0.054 ms` | **-99.8%** |
-| **DB Query Latency** | `1,910 ms` | `0.046 ms` | **-99.9%** |
-| **Throughput** | `14.2 req/s` | `850+ req/s` | **60x boost** |
-| **Error Rate** | `0.003` | `0.000` | Within budget |
-| **Test Suite** | 5/5 PASSED | 5/5 PASSED | Clean baseline |
-
-### Adaptive Replanning Demonstration
-- **Attempt 1:** Standard index migration was generated. Tests passed and Performance passed. **Red Team rejected** the change due to table-locking hazards under high write concurrency.
-- **Agent Adaptation:** Agent adapted the plan, switching to PostgreSQL `CREATE INDEX CONCURRENTLY IF NOT EXISTS` executed outside a transaction block with matching `DROP INDEX CONCURRENTLY` rollback.
-- **Attempt 2:** All reviewers (Performance, Reliability/DB, Red Team) and deterministic policy scored **PASS**.
-- **Human Gate:** TrueForge paused execution with `type: "tool.approval_required"`. Operator authorized deployment, and validated trajectory was committed to Case Memory.
-
----
-
-## 4. Repository Structure
-
-```
-d:\TrueFoundry\
-├── ActionShield_PROJECT.md   # Official hackathon specification
-├── ActionShield_PLAN.md      # Architecture & build plan
-├── demo-app/                 # Dedicated demo app (FastAPI, PostgreSQL, Migrations)
-│   ├── app/                  # Orders service & telemetry middleware
-│   ├── migrations/           # 001_initial_schema.sql, 002_add_orders_index.sql
-│   ├── scripts/              # seed_db.py, load_test.py, migrate.py
-│   └── tests/                # Automated pytest test suite
-├── mcp_server/               # ActionShield MCP Server (FastMCP / SSE)
-│   └── server.py             # 11 tools for metrics, DB, policy, memory, deploy
-├── core/                     # Core engine components
-│   ├── contracts.py          # Action Contract schema & scope checker
-│   ├── policy_engine.py      # Deterministic code-level safety engine
-│   ├── evidence.py           # Structured evidence & telemetry models
-│   └── case_memory.py        # Case Memory store & symptom search
-├── agents/                   # Evaluator personas
-│   └── reviewers.py          # Performance, Reliability/DB, and Red Team
-└── ui/                       # Interactive incident dashboard (port 3000)
-    ├── index.html
-    ├── style.css
-    └── app.js
-```
+| **1** | `setup_sandbox_replica` | **Phase 1: Setup** | Clones candidate commit into an isolated Daytona Sandbox container. |
+| **2** | `seed_sandbox_database` | **Phase 1: Seeding** | Seeds sandbox database with 50,000 realistic orders in < 1 second. |
+| **3** | `run_sandbox_benchmark` | **Phase 1: Diagnosis** | Runs concurrent requests inside sandbox; captures `EXPLAIN QUERY PLAN` & latency. |
+| **4** | `run_red_team_agent` | **Phase 1: Security** | Adversarial agent scanning SQL for table-locking hazards (`ACCESS EXCLUSIVE`). |
+| **5** | `apply_sandbox_fix` | **Phase 2: Remediation** | Applies candidate non-blocking migration (`CREATE INDEX CONCURRENTLY`) in sandbox. |
+| **6** | `push_branch_commit` | **Phase 2: GitOps** | Creates branch `fix/orders-index-optimization` and pushes to GitHub (main untouched). |
+| **7** | `query_repo_memory` | **Learning** | Retrieves historical incident resolutions specific to `repo_id: trufoundary-demo`. |
+| **8** | `store_repo_memory` | **Learning** | Persists verified findings, symptom signatures, and code fixes under the repo ID. |
+| **9** | `get_service_metrics` | **Telemetry** | Live telemetry inspection from `/metrics` endpoint. |
+| **10**| `get_database_schema` | **Introspection** | Inspects tables, columns, and detects missing indexes. |
+| **11**| `apply_production_fix` | **Human Checkpoint** | Production deployment tool gated by TrueForge's `tool.approval_required`. |
 
 ---
 
-## 5. Quickstart
+## 🏛️ 5. System Architecture & Flow Diagrams
 
-### 1. Launch ActionShield MCP Server
-```bash
-python mcp_server/server.py
+### High-Level System Architecture
+
+```mermaid
+graph TB
+    subgraph DevLayer["1. Developer & Presentation Layer"]
+        Developer["Developer / Operator"]
+        Dashboard["ActionShield Mission Dashboard<br>(http://localhost:3000)"]
+        GitHubRepo["GitHub Repository: trufoundary-demo<br>(Branches: main, fix/orders-index-optimization)"]
+    end
+
+    subgraph TrueForgeLayer["2. TrueForge Platform Runtime (Port 8790)"]
+        TFStudio["TrueForge Agent Studio / Chat UI"]
+        TFOrchestrator["TrueForge Orchestrator & Session Manager"]
+        TFPolicyEngine["TrueForge Policy Gate<br>(Tool Approval Checkpoints)"]
+        TFAgent["ActionShield Agent<br>(OpenAI GPT-5.5)"]
+    end
+
+    subgraph MCPLayer["3. ActionShield MCP Server (Port 8791 & Cloudflare)"]
+        MCPEndpoint["MCP Server HTTP/SSE App<br>(/mcp)"]
+        subgraph ToolRegistry["Registered MCP Tools"]
+            T_Sand["setup_sandbox_replica<br>seed_sandbox_database"]
+            T_Bench["run_sandbox_benchmark<br>profile_query_plan"]
+            T_Rev["run_red_team_agent"]
+            T_Branch["apply_sandbox_fix<br>push_branch_commit"]
+            T_Mem["query_repo_memory<br>store_repo_memory"]
+        end
+    end
+
+    subgraph DaytonaLayer["4. Daytona Cloud Sandbox (Isolated Replica)"]
+        SandboxContainer["Isolated Daytona Linux Container"]
+        SandboxApp["Target Orders API Instance"]
+        SandboxDB["Seeded SQLite/Postgres DB (50k rows)"]
+        SandboxProfiler["EXPLAIN ANALYZE & Concurrency Load Generator"]
+    end
+
+    subgraph MemoryLayer["5. Repository-Specific Learning Store"]
+        RepoMemoryDB["Repo Case Memory<br>(data/case_memory.json keyed by repo_id)"]
+    end
+
+    Developer -->|Trigger & Decision| TFStudio
+    Developer -->|View Telemetry| Dashboard
+    GitHubRepo -->|Source Cloned into Sandbox| SandboxContainer
+
+    TFStudio --> TFOrchestrator
+    TFOrchestrator --> TFAgent
+    TFAgent --> TFPolicyEngine
+    TFAgent -->|JSON-RPC SSE/HTTP| MCPEndpoint
+
+    MCPEndpoint --> ToolRegistry
+    T_Sand --> SandboxContainer
+    SandboxContainer --> SandboxApp
+    SandboxContainer --> SandboxDB
+    T_Bench --> SandboxProfiler
+    T_Rev --> SandboxProfiler
+    T_Branch --> GitHubRepo
+    T_Mem <--> RepoMemoryDB
 ```
 
-### 2. Expose via Tunnel (for TrueForge / Daytona)
-```bash
-./tools/cloudflared.exe tunnel --url http://localhost:8791
+---
+
+### The 2-Phase GitOps Lifecycle
+
+```mermaid
+flowchart TD
+    Start(["Developer Pushes Commit or Requests Pre-Flight Check"]) --> S1["1. Provision Isolated Daytona Sandbox"]
+    
+    subgraph SandboxPhase1["PHASE 1: Deep Sandbox Stress Testing & Diagnosis"]
+        S1 --> Seed["Clone Repo & Seed Sandbox DB with 50,000 Realistic Orders"]
+        Seed --> LaunchApp["Launch Application Service inside Sandbox"]
+        LaunchApp --> MultiAgent["Multi-Agent Testing Layer Dispatched:<br>• Performance Agent: p50/p95 latency & EXPLAIN ANALYZE<br>• DB Reliability Agent: Index coverage & transaction safety<br>• Red Team Agent: Table lock hazards & concurrency contention"]
+        
+        MultiAgent --> MetricsCaptured["Diagnostic Findings Captured:<br>• p95 Latency: 2,340 ms (Fails &lt;700ms SLO)<br>• Query: Full table scan on orders(user_id, created_at)<br>• Affected File: app/routes/orders.py<br>• Risk: High lock contention under production traffic"]
+    end
+
+    MetricsCaptured --> S2["2. Present Issue Summary to Developer"]
+    S2 --> SummaryReport["Detailed Summary Delivered via TrueForge:<br>• Issue Seen: 2,340ms latency bottleneck<br>• Root Cause: Missing composite index<br>• Expected Hazard: Table locks under load<br>• Affected Files: app/routes/orders.py, schema"]
+
+    SummaryReport --> AskFix["ask_user_decision:<br>'Would you like me to create a fix branch (fix/orders-index-optimization)<br>and test the proposed fix in the sandbox?'"]
+
+    AskFix --> UserDecision{"Developer Decision in TrueForge"}
+    
+    UserDecision -->|Inspect Only| ManualFix(["Developer Fixes Manually — Sandbox Cleaned Up"])
+    
+    UserDecision -->|Create Fix Branch & Test| S3["3. Branch Creation & Sandbox Verification"]
+
+    subgraph SandboxPhase2["PHASE 2: Branch Creation & Re-Testing in Sandbox"]
+        S3 --> GitBranch["Create New Git Branch: fix/orders-index-optimization"]
+        GitBranch --> QueryMem["Query Repo Memory for Past Solutions"]
+        QueryMem --> AdaptFix["Generate Candidate Non-Blocking Fix:<br>CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_user_created<br>+ Reversible Rollback Script"]
+        
+        AdaptFix --> ApplySand["Apply Fix in Sandbox Database"]
+        ApplySand --> ReTest["Re-run Benchmark inside Sandbox:<br>• Latency drops from 2,340ms ➔ 0.054ms (-99.8%)<br>• Red Team confirms zero table locks<br>• Reliability Agent confirms rollback works"]
+    end
+
+    ReTest --> S4["4. Push Fix Branch & Evidence Report"]
+    S4 --> PushGit["Commit & Push fix/orders-index-optimization to GitHub<br>(Production main is NOT touched)"]
+    
+    PushGit --> S5["5. Store Repository-Specific Memory"]
+    S5 --> Learn["Persist Trajectory to Repo Memory:<br>• repo_id: trufoundary-demo<br>• Symptoms & Query Signature<br>• Validated Migration Fix & Metrics"]
+    
+    Learn --> Ready(["Branch Ready for Developer to Review & Merge Manually!"])
 ```
 
-### 3. Register in TrueForge
-Register the MCP server at `http://localhost:8790/`:
-- **Name:** `actionshield-mcp`
-- **URL:** `<your-cloudflared-url>/mcp`
+---
 
-### 4. Run the Mission Dashboard
-Open `http://localhost:3000` in your browser to view the live execution timeline, before/after telemetry graphs, reviewer cards, and the interactive human approval modal.
+## 🌐 6. Active Local Services
+
+| Service | Port / URL | Description | Status |
+| :--- | :--- | :--- | :--- |
+| **TrueForge Agent Studio** | [`http://localhost:8790`](http://localhost:8790) | Central Agent runtime, chat session, and policy engine. | **Active** |
+| **ActionShield Mission Dashboard** | [`http://localhost:3000`](http://localhost:3000) | Live mission control, multi-agent status, and telemetry. | **Active** |
+| **ActionShield MCP Server** | [`http://localhost:8791/mcp`](http://localhost:8791/mcp) | FastMCP server exposing 11 pre-flight tools over HTTP/SSE. | **Active** |
+| **Target eCommerce App** | [`http://localhost:8000`](http://localhost:8000) | Production-like orders service with interactive tester. | **Active** |
+| **GitHub Target Repository** | [`trufoundary-demo`](https://github.com/rajnishkumar13500/trufoundary-demo) | Live target repo with `main` and `fix/orders-index-optimization`. | **Active** |
+
+---
+
+## 🚀 7. How to Test (Step-by-Step)
+
+### Option A: Automated 1-Click Verification Test (15 Seconds)
+Run the complete end-to-end verification script from the project root:
+
+```powershell
+python scripts/test_sandbox_gitops_flow.py
+```
+
+**What it validates:**
+1. Sets up isolated sandbox replica `sbx_live_test`.
+2. Seeds 50,000 orders into the sandbox DB in 0.33s.
+3. Profiles query plan: detects `SEQUENTIAL_TABLE_SCAN` (`p95 = 2,340 ms`).
+4. Red Team rejects Attempt 1 (`REDTEAM_DDL_LOCK`).
+5. Adapts to `CREATE INDEX CONCURRENTLY` (Attempt 2 passes).
+6. Re-benchmarks: latency drops to **0.298 ms** (**99.99% reduction**).
+7. Pushes dedicated branch `fix/orders-index-optimization` to GitHub (zero commits on `main`).
+8. Stores resolution into Repository Case Memory (`trufoundary-demo`).
+
+---
+
+### Option B: Interactive Live Demo in TrueForge Studio
+
+1. Open **[`http://localhost:8790`](http://localhost:8790)**.
+2. Select **`actionshield-agent`** and click **New Chat**.
+3. **Send Prompt 1 (Phase 1 Pre-Flight Testing)**:
+   ```text
+   Run deep in-depth pre-flight testing on https://github.com/rajnishkumar13500/trufoundary-demo.git. Seed the sandbox with 50,000 orders, profile query plans and latency under load, and report the issue summary.
+   ```
+   *The agent provisions the sandbox, seeds 50k orders, captures the 2,340ms sequential scan, and presents the issue summary.*
+4. **Send Prompt 2 (Phase 2 Branch Creation & Fix)**:
+   ```text
+   Yes, please create the branch fix/orders-index-optimization and test the fix in the sandbox.
+   ```
+   *The agent creates the branch, tests `CREATE INDEX CONCURRENTLY`, verifies latency drops to < 1ms, pushes the branch to GitHub, and saves repository memory.*
+5. Open **[`http://localhost:3000`](http://localhost:3000)** to view the final visual telemetry and repository memory card!
+
+---
+
+## 🛡️ 8. Security & Safety Invariants
+
+- **Zero Blind Production Writes**: No code or migration is applied to production or merged to `main` automatically.
+- **Empirical Proof Before Suggestion**: No hypothetical estimates—every metric is backed by actual sandbox execution.
+- **Mandatory Rollback Artifacts**: Every schema migration must have an automated, tested inverse (`DROP INDEX CONCURRENTLY`).
+- **Human-in-the-Loop Gatekeeper**: Consequential production deployments require explicit human sign-off via TrueForge.
