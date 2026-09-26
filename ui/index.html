@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ActionShield --- Autonomous Engineering & Self-Validating Agent</title>
+  <meta name="description" content="TrueForge-powered autonomous self-validating engineering agent for the Agents That Act hackathon.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="logo-group">
+      <div class="shield-badge">🛡️</div>
+      <div class="logo-titles">
+        <h1>ActionShield</h1>
+        <span class="runtime-tag">TrueForge Agent Runtime</span>
+      </div>
+    </div>
+    <div class="header-status-group">
+      <div class="badge badge-online">
+        <span class="dot"></span> TrueForge: <strong id="tf-status">v0.2.1 Active</strong>
+      </div>
+      <div class="badge badge-sandbox">
+        <span class="dot-amber"></span> Daytona Sandbox: <strong id="sandbox-status">Connected</strong>
+      </div>
+      <div class="badge badge-model">
+        <span>⚡ Model:</span> <strong>OpenAI GPT-5.5</strong>
+      </div>
+    </div>
+  </header>
+
+  <main class="dashboard-grid">
+    <!-- Left Column: Incident Control & Lifecycle Timeline -->
+    <section class="panel timeline-panel">
+      <div class="panel-header">
+        <div class="title-with-icon">
+          <span class="icon">🧭</span>
+          <h2>Agent Execution Loop</h2>
+        </div>
+        <span class="motto">Memory suggests. Simulation verifies. Evidence decides.</span>
+      </div>
+
+      <div class="incident-card">
+        <div class="incident-meta">
+          <span class="incident-tag high-priority">INCIDENT #001</span>
+          <span class="incident-time" id="incident-timestamp">Live</span>
+        </div>
+        <h3 class="incident-title">Orders API Latency Spike (> 2,300ms p95)</h3>
+        <p class="incident-desc">User-scoped order listing query taking excessive time under production load. Missing database index suspected.</p>
+        <div class="action-bar">
+          <button id="btn-trigger" class="btn btn-primary">
+            <span class="btn-icon">▶</span> Run Investigation Loop
+          </button>
+          <button id="btn-retest" class="btn btn-secondary">
+            <span class="btn-icon">🔄</span> Re-run Benchmark
+          </button>
+        </div>
+      </div>
+
+      <!-- Stepper / Lifecycle Nodes -->
+      <div class="stepper-container" id="stepper-list">
+        <!-- 1. REMEMBER -->
+        <div class="step-card active" id="step-remember">
+          <div class="step-indicator">
+            <div class="step-icon">1</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-header">
+              <span class="step-name">REMEMBER</span>
+              <span class="step-status status-success">Case Matched</span>
+            </div>
+            <p class="step-desc">Retrieved historical case <code>case_001_legacy_orders_slowdown</code> from Case Memory. Hypothesis: missing composite index on <code>orders(user_id, created_at DESC)</code>.</p>
+          </div>
+        </div>
+
+        <!-- 2. REASON -->
+        <div class="step-card active" id="step-reason">
+          <div class="step-indicator">
+            <div class="step-icon">2</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-header">
+              <span class="step-name">REASON</span>
+              <span class="step-status status-success">Action Contract Signed</span>
+            </div>
+            <p class="step-desc">Declared scope: <code>migrations/*.sql</code> only. Rollback strategy: <code>DROP INDEX CONCURRENTLY</code>. Constraints: zero data mutation.</p>
+          </div>
+        </div>
+
+        <!-- 3. ACT -->
+        <div class="step-card active" id="step-act">
+          <div class="step-indicator">
+            <div class="step-icon">3</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-header">
+              <span class="step-name">ACT (Isolation)</span>
+              <span class="step-status status-success">Branch Created</span>
+            </div>
+            <p class="step-desc">Created Daytona workspace branch <code>agent/orders-latency-incident</code>. Generated concurrent non-blocking migration.</p>
+          </div>
+        </div>
+
+        <!-- 4. OBSERVE -->
+        <div class="step-card active" id="step-observe">
+          <div class="step-indicator">
+            <div class="step-icon">4</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-header">
+              <span class="step-name">OBSERVE</span>
+              <span class="step-status status-success">Evidence Measured</span>
+            </div>
+            <p class="step-desc">Explain plan transformed from full table scan to B-Tree index scan. Measured p95 drop from <strong>2,340ms to 0.054ms</strong> (99.8% reduction).</p>
+          </div>
+        </div>
+
+        <!-- 5. CRITIQUE -->
+        <div class="step-card active" id="step-critique">
+          <div class="step-indicator">
+            <div class="step-icon">5</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-header">
+              <span class="step-name">CRITIQUE (Reviewers & Policy)</span>
+              <span class="step-status status-adapted">Attempt 1 Rejection -> Adapted</span>
+            </div>
+            <p class="step-desc">Red Team challenged attempt 1 table lock risk. Agent adapted by specifying <code>CONCURRENTLY</code> outside transaction blocks. Attempt 2: All reviewers passed!</p>
+          </div>
+        </div>
+
+        <!-- 6. HUMAN CHECKPOINT -->
+        <div class="step-card active glow-checkpoint" id="step-human">
+          <div class="step-indicator">
+            <div class="step-icon">6</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-header">
+              <span class="step-name">HUMAN CHECKPOINT</span>
+              <span class="step-status status-allowed" id="checkpoint-badge">Approved by Operator</span>
+            </div>
+            <p class="step-desc">Native TrueForge <code>tool.approval_required</code> halted on <code>apply_production_fix</code>. Human operator reviewed diff and authorized execution.</p>
+          </div>
+        </div>
+
+        <!-- 7. VERIFY & STORE -->
+        <div class="step-card active" id="step-store">
+          <div class="step-indicator">
+            <div class="step-icon">7</div>
+          </div>
+          <div class="step-body">
+            <div class="step-header">
+              <span class="step-name">VERIFY & STORE</span>
+              <span class="step-status status-success">Case Stored</span>
+            </div>
+            <p class="step-desc">Post-deployment verification healthy. Incident trajectory persisted to Case Memory as <code>case_20260926075215_c02e</code>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Live Telemetry, Evidence, Diffs, Reviewers -->
+    <section class="panel details-panel">
+      <!-- Evidence Header -->
+      <div class="panel-header">
+        <div class="title-with-icon">
+          <span class="icon">📊</span>
+          <h2>Empirical Verification & Evidence</h2>
+        </div>
+        <div class="badge-row">
+          <span class="pill pill-green">Tests: 5/5 PASSED</span>
+          <span class="pill pill-blue">Scope: 100% COMPLIANT</span>
+          <span class="pill pill-purple">Policy: 0 VIOLATIONS</span>
+        </div>
+      </div>
+
+      <!-- Before vs After Metrics Grid -->
+      <div class="metrics-comparison-container">
+        <div class="metric-card before-card">
+          <div class="metric-label">BEFORE (Unindexed Baseline)</div>
+          <div class="metric-value-row">
+            <span class="val danger" id="before-p95">2,340 ms</span>
+            <span class="metric-sub">p95 Latency</span>
+          </div>
+          <div class="metric-details">
+            <div class="detail-item"><span>DB Query:</span> <strong>1,910 ms</strong></div>
+            <div class="detail-item"><span>Scan Type:</span> <strong class="badge-scan">FULL TABLE SCAN</strong></div>
+            <div class="detail-item"><span>Throughput:</span> <strong>14.2 req/s</strong></div>
+          </div>
+        </div>
+
+        <div class="metric-arrow-divider">
+          <div class="arrow-circle">➔</div>
+          <span class="improvement-pill" id="pct-improvement">-99.8%</span>
+        </div>
+
+        <div class="metric-card after-card">
+          <div class="metric-label">AFTER (Validated Migration)</div>
+          <div class="metric-value-row">
+            <span class="val success" id="after-p95">0.054 ms</span>
+            <span class="metric-sub">p95 Latency</span>
+          </div>
+          <div class="metric-details">
+            <div class="detail-item"><span>DB Query:</span> <strong>0.046 ms</strong></div>
+            <div class="detail-item"><span>Scan Type:</span> <strong class="badge-index">INDEX B-TREE SEARCH</strong></div>
+            <div class="detail-item"><span>Throughput:</span> <strong>850+ req/s</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reviewer Triumvirate Cards -->
+      <div class="reviewers-section">
+        <h3 class="section-title">Specialized Reviewer Triumvirate</h3>
+        <div class="reviewers-grid">
+          <!-- Performance -->
+          <div class="reviewer-card">
+            <div class="rev-header">
+              <span class="rev-name">⚡ Performance Reviewer</span>
+              <span class="rev-badge pass">PASS (9/10)</span>
+            </div>
+            <p class="rev-finding">p95 latency reduced by 99.8%. Composite B-Tree index resolves sequential scan bottleneck.</p>
+          </div>
+
+          <!-- Reliability / DB -->
+          <div class="reviewer-card">
+            <div class="rev-header">
+              <span class="rev-name">🛡️ Reliability / DB Safety</span>
+              <span class="rev-badge pass">PASS (9/10)</span>
+            </div>
+            <p class="rev-finding">Non-blocking index creation verified. Safe reversible rollback migration provided.</p>
+          </div>
+
+          <!-- Red Team -->
+          <div class="reviewer-card red-team-card">
+            <div class="rev-header">
+              <span class="rev-name">🎯 Red Team (Adversarial)</span>
+              <span class="rev-badge pass">PASS (Attempt 2)</span>
+            </div>
+            <p class="rev-finding"><strong>Attempt 1:</strong> Rejected due to table-lock hazards.<br><strong>Attempt 2:</strong> Approved with <code>CONCURRENTLY</code> execution outside transaction blocks.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Code & Migration Diff Viewer -->
+      <div class="diff-section">
+        <div class="diff-header">
+          <div class="diff-title">
+            <span class="file-icon">📄</span>
+            <span>migrations/20260926_add_orders_user_created_index.sql</span>
+          </div>
+          <span class="diff-badge added">+6 lines</span>
+        </div>
+        <pre class="diff-code"><code><span class="diff-comment">-- Incident: Orders API latency too high</span>
+<span class="diff-comment">-- Purpose: speed up user-scoped order listing sorted by newest first.</span>
+<span class="diff-comment">-- Production safety: PostgreSQL CONCURRENTLY avoids blocking writes on large orders tables.</span>
+<span class="diff-comment">-- Must be executed outside a transaction block.</span>
+<span class="diff-add">+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_user_created</span>
+<span class="diff-add">+ON orders(user_id, created_at DESC);</span></code></pre>
+      </div>
+
+      <!-- Rollback Verification -->
+      <div class="rollback-section">
+        <div class="diff-header">
+          <div class="diff-title">
+            <span class="file-icon">↩️</span>
+            <span>migrations/20260926_rollback_orders_user_created_index.sql (Rollback)</span>
+          </div>
+          <span class="diff-badge removed">Reversible</span>
+        </div>
+        <pre class="diff-code"><code><span class="diff-comment">-- Rollback for Orders API latency index migration.</span>
+<span class="diff-comment">-- Production safety: concurrent drop avoids blocking writes.</span>
+<span class="diff-rem">-DROP INDEX CONCURRENTLY IF EXISTS idx_orders_user_created;</span></code></pre>
+      </div>
+
+      <!-- Action Contract Summary -->
+      <div class="contract-box">
+        <div class="contract-header">
+          <span>📜 Active Action Contract</span>
+          <span class="pill pill-green">Status: Validated</span>
+        </div>
+        <div class="contract-grid">
+          <div><strong>Goal:</strong> Reduce Orders API latency below 700ms</div>
+          <div><strong>Scope:</strong> <code>migrations/*.sql</code> only (No app code modified)</div>
+          <div><strong>Invariants:</strong> Zero data loss, error rate &lt; 1%, tests pass</div>
+          <div><strong>Rollback:</strong> <code>DROP INDEX CONCURRENTLY IF EXISTS idx_orders_user_created;</code></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Interactive Human Approval Modal -->
+  <div class="modal-overlay" id="approval-modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="alert-icon">⚠️</span>
+          <h3>TrueForge Checkpoint: Human Approval Required</h3>
+        </div>
+        <button class="modal-close" id="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>ActionShield has validated the proposed fix in the Daytona sandbox with passing policy and reviewer checks. The agent has invoked <code>apply_production_fix</code> and is waiting for your authorization.</p>
+        <div class="modal-evidence-box">
+          <div><strong>Incident:</strong> Orders API Latency Spike</div>
+          <div><strong>Validated Metric:</strong> p95 dropped from 2,340ms to 0.054ms (-99.8%)</div>
+          <div><strong>Reviewers:</strong> Performance (PASS), Reliability (PASS), Red Team (PASS)</div>
+          <div><strong>Target:</strong> Controlled Production Environment</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="btn-deny">Deny Action</button>
+        <button class="btn btn-success" id="btn-allow">Authorize & Execute Fix</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
