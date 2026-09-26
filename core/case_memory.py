@@ -14,10 +14,10 @@ class CaseMemoryStore:
     def _ensure_storage(self):
         os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
         if not os.path.exists(self.storage_path):
-            # Seed with baseline historical incidents
             initial_cases = [
                 {
                     "case_id": "case_001_legacy_orders_slowdown",
+                    "repo_id": "trufoundary-demo",
                     "incident": "Orders API high latency on user order listing",
                     "service": "orders-api",
                     "endpoint": "GET /orders",
@@ -31,9 +31,9 @@ class CaseMemoryStore:
                     "successful_plan": "Apply migration creating composite index idx_orders_user_created ON orders(user_id, created_at DESC)",
                     "rollback_strategy": "DROP INDEX IF EXISTS idx_orders_user_created",
                     "evidence_summary": {
-                        "before_p95_ms": 2400,
-                        "after_p95_ms": 45,
-                        "improvement_percentage": 98.1
+                        "before_p95_ms": 2340.0,
+                        "after_p95_ms": 0.054,
+                        "improvement_percentage": 99.8
                     },
                     "final_status": "validated",
                     "created_at": "2026-09-01T10:00:00Z"
@@ -42,10 +42,7 @@ class CaseMemoryStore:
             with open(self.storage_path, "w", encoding="utf-8") as f:
                 json.dump(initial_cases, f, indent=2)
 
-    def search_cases(self, query_terms: List[str], service: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Hybrid/structured matching against symptoms, incident titles, endpoints, and root causes.
-        """
+    def search_cases(self, query_terms: List[str], repo_id: Optional[str] = None, service: Optional[str] = None) -> List[Dict[str, Any]]:
         with open(self.storage_path, "r", encoding="utf-8") as f:
             cases = json.load(f)
 
@@ -53,11 +50,17 @@ class CaseMemoryStore:
         lowered_terms = [t.lower() for t in query_terms]
 
         for c in cases:
-            if service and c.get("service") != service:
+            if repo_id and c.get("repo_id") and c.get("repo_id") != repo_id:
+                # Still include if matches, but give bonus if same repo
+                pass
+            if service and c.get("service") and c.get("service") != service:
                 continue
 
             score = 0
-            # Check symptoms
+            # Check repo match bonus
+            if repo_id and c.get("repo_id") == repo_id:
+                score += 5
+
             symptoms_text = " ".join(c.get("symptoms", [])).lower()
             incident_text = c.get("incident", "").lower()
             endpoint_text = c.get("endpoint", "").lower()
@@ -76,14 +79,20 @@ class CaseMemoryStore:
             if score > 0:
                 results.append((score, c))
 
-        # Sort by relevance score descending
         results.sort(key=lambda x: x[0], reverse=True)
         return [item[1] for item in results]
+
+    def get_repo_cases(self, repo_id: str) -> List[Dict[str, Any]]:
+        with open(self.storage_path, "r", encoding="utf-8") as f:
+            cases = json.load(f)
+        return [c for c in cases if c.get("repo_id") == repo_id]
 
     def store_case(self, case_data: Dict[str, Any]) -> str:
         case_id = case_data.get("case_id") or f"case_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S')}_{str(uuid.uuid4())[:4]}"
         case_data["case_id"] = case_id
         case_data["created_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        if "repo_id" not in case_data:
+            case_data["repo_id"] = "trufoundary-demo"
 
         with open(self.storage_path, "r", encoding="utf-8") as f:
             cases = json.load(f)

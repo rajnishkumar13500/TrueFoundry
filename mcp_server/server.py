@@ -319,6 +319,101 @@ def apply_production_fix(
         "verification": "Orders endpoint healthy; p95 latency operating within SLA (<700ms)."
     }, indent=2)
 
+# --- 7. GitOps Sandbox & Pre-Flight Testing Tools ---
+
+from core.sandbox import sandbox_manager
+
+@mcp_server.tool()
+def setup_sandbox_replica(repo_path: str = "demo-app", sandbox_id: str = "sbx_001") -> str:
+    """Clone and provision an isolated sandbox container replica of the target repository."""
+    base_repo = os.path.abspath(repo_path)
+    if not os.path.exists(base_repo):
+        base_repo = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "demo-app")
+    res = sandbox_manager.setup_sandbox(repo_path=base_repo, sandbox_id=sandbox_id)
+    return json.dumps(res, indent=2)
+
+@mcp_server.tool()
+def seed_sandbox_database(sandbox_id: str = "sbx_001", count: int = 50000) -> str:
+    """Seed the isolated sandbox database with realistic production scale (50,000 orders)."""
+    res = sandbox_manager.seed_database(sandbox_id=sandbox_id, count=count)
+    return json.dumps(res, indent=2)
+
+@mcp_server.tool()
+def run_sandbox_benchmark(sandbox_id: str = "sbx_001", iterations: int = 20) -> str:
+    """Execute target queries in sandbox to measure true latency and analyze query execution plan."""
+    res = sandbox_manager.run_benchmark(sandbox_id=sandbox_id, iterations=iterations)
+    return json.dumps(res, indent=2)
+
+@mcp_server.tool()
+def run_red_team_agent(sql_content: str) -> str:
+    """Adversarial security and database safety agent: scans SQL for table lock hazards (ACCESS EXCLUSIVE)."""
+    res = sandbox_manager.evaluate_red_team(sql_content=sql_content)
+    return json.dumps(res, indent=2)
+
+@mcp_server.tool()
+def apply_sandbox_fix(sandbox_id: str = "sbx_001", sql_content: str = "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_user_created ON orders(user_id, created_at DESC);") -> str:
+    """Apply candidate schema migration fix to sandbox database for closed-loop validation."""
+    res = sandbox_manager.apply_migration(sandbox_id=sandbox_id, sql_content=sql_content)
+    return json.dumps(res, indent=2)
+
+@mcp_server.tool()
+def push_branch_commit(
+    repo_path: str = "demo-app",
+    branch_name: str = "fix/orders-index-optimization",
+    message: str = "fix(db): add non-blocking composite index idx_orders_user_created"
+) -> str:
+    """Create dedicated fix branch and push to GitHub for developer to review and merge manually (no direct merge to main)."""
+    base_repo = os.path.abspath(repo_path)
+    if not os.path.exists(base_repo):
+        base_repo = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "demo-app")
+    
+    mig_content = """-- 002_add_orders_index.sql
+-- Optimizes query: SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_user_created
+ON orders(user_id, created_at DESC);
+"""
+    res = sandbox_manager.create_and_push_branch(
+        repo_path=base_repo,
+        branch_name=branch_name,
+        migration_filename="002_add_orders_index.sql",
+        migration_content=mig_content,
+        message=message
+    )
+    return json.dumps(res, indent=2)
+
+@mcp_server.tool()
+def query_repo_memory(repo_id: str = "trufoundary-demo") -> str:
+    """Retrieve historical incident resolutions and learned lessons specific to this repository."""
+    cases = case_memory.get_repo_cases(repo_id=repo_id)
+    return json.dumps({"repo_id": repo_id, "cases": cases}, indent=2)
+
+@mcp_server.tool()
+def store_repo_memory(
+    repo_id: str,
+    incident: str,
+    symptoms: List[str],
+    root_cause: str,
+    fix: str,
+    before_p95_ms: float,
+    after_p95_ms: float
+) -> str:
+    """Persist verified incident resolution into repository-specific Case Memory."""
+    case_id = case_memory.store_case({
+        "repo_id": repo_id,
+        "incident": incident,
+        "symptoms": symptoms,
+        "root_cause": root_cause,
+        "successful_plan": fix,
+        "rollback_strategy": "DROP INDEX CONCURRENTLY IF EXISTS idx_orders_user_created;",
+        "evidence_summary": {
+            "before_p95_ms": before_p95_ms,
+            "after_p95_ms": after_p95_ms,
+            "improvement_pct": round(((before_p95_ms - after_p95_ms) / max(1.0, before_p95_ms)) * 100, 2)
+        },
+        "final_status": "validated_in_sandbox"
+    })
+    return json.dumps({"status": "STORED", "repo_id": repo_id, "case_id": case_id}, indent=2)
+
 from mcp.server.transport_security import TransportSecuritySettings
 
 def get_app():
