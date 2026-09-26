@@ -14,11 +14,13 @@
 
 When software teams write code or modify database queries, traditional CI/CD pipelines run unit tests with **only 4 or 5 fake rows of sample data in memory**. Everything passes and turns green!
 
-```
-[Developer Commits Code] ➔ [Standard CI Runs Tests with 5 Fake Rows] ➔ [Status: PASSED 🟢]
-                                       │
-                                       ▼ (Merged to Production)
-[Production with 50,000 Real Customer Orders] ➔ [FULL TABLE SCAN! Latency Spikes to 2,340ms! Checkout Freezes! 💥]
+```mermaid
+flowchart LR
+    Dev["Developer Commits Code"] --> CI["Standard CI Runs Tests<br>(5 Fake Rows in Memory)"]
+    CI --> Pass["Status: PASSED 🟢<br>(False Confidence)"]
+    Pass --> Merge["Merged to Production"]
+    Merge --> Prod["Production Database<br>(50,000 Real Customer Orders)"]
+    Prod --> Outage["💥 FULL TABLE SCAN!<br>Latency Spikes to 2,340ms!<br>Checkout Freezes!"]
 ```
 
 ### The Real-World Blindspot:
@@ -44,28 +46,29 @@ When software teams write code or modify database queries, traditional CI/CD pip
 
 TrueForge serves as the **core runtime, orchestrator, and security backbone** for ActionShield:
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        TRUEFORGE AGENT STUDIO                          │
-│                                                                        │
-│   ┌───────────────────────────┐      ┌─────────────────────────────┐   │
-│   │   OpenAI GPT-5.5 Agent    │◄────►│  Native Checkpoint Policy   │   │
-│   │   (actionshield-agent)    │      │  (tool.approval_required)   │   │
-│   └─────────────┬─────────────┘      └─────────────────────────────┘   │
-│                 │ (Streamable HTTP / SSE JSON-RPC)                     │
-│                 ▼                                                      │
-│   ┌────────────────────────────────────────────────────────────────┐   │
-│   │                 ActionShield MCP Server (:8791)                │   │
-│   │       11 Specialized Pre-Flight, Sandbox & Memory Tools        │   │
-│   └────────────────────────────────────────────────────────────────┘   │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                ┌───────────────────┴───────────────────┐
-                ▼                                       ▼
-    ┌────────────────────────┐              ┌────────────────────────┐
-    │ Daytona Cloud Sandbox  │              │  Persistent Case DB    │
-    │ (Isolated Environment) │              │  (data/case_memory)    │
-    └────────────────────────┘              └────────────────────────┘
+```mermaid
+graph TB
+    subgraph TrueForgeStudio["TrueForge Platform Runtime (Port 8790)"]
+        TFAgent["OpenAI GPT-5.5 Agent<br>(actionshield-agent)"]
+        TFPolicy["Native Checkpoint Policy<br>(tool.approval_required)"]
+        TFAgent <-->|Policy Gate| TFPolicy
+        
+        MCPServer["ActionShield MCP Server (Port 8791)<br>Streamable HTTP/SSE JSON-RPC Protocol"]
+        TFAgent -->|JSON-RPC Tool Calls| MCPServer
+    end
+
+    subgraph Sandboxes["Isolated Daytona Sandbox"]
+        DaytonaContainer["Ephemeral Sandbox Container"]
+        SandboxDB["Seeded SQLite/Postgres DB (50,000 orders)"]
+        DaytonaContainer --> SandboxDB
+    end
+
+    subgraph Memory["Persistence Store"]
+        CaseDB[("Case Memory Store<br>(data/case_memory.json)")]
+    end
+
+    MCPServer -->|Isolated Testing & Benchmarking| DaytonaContainer
+    MCPServer <-->|Continuous Learning| CaseDB
 ```
 
 ### How ActionShield Leverages TrueForge:
@@ -197,6 +200,72 @@ flowchart TD
     S5 --> Learn["Persist Trajectory to Repo Memory:<br>• repo_id: trufoundary-demo<br>• Symptoms & Query Signature<br>• Validated Migration Fix & Metrics"]
     
     Learn --> Ready(["Branch Ready for Developer to Review & Merge Manually!"])
+```
+
+---
+
+### Sequence Diagram: Exact Tool Interactions
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer / Operator
+    participant TF as TrueForge Studio (8790)
+    participant Agent as ActionShield Agent (GPT-5.5)
+    participant MCP as ActionShield MCP Server (8791)
+    participant Sandbox as Daytona Sandbox (sbx_001)
+    participant GitHub as GitHub Repo (trufoundary-demo)
+
+    Note over Dev,GitHub: Phase 1: Deep Sandbox Testing & Issue Summary
+    Dev->>TF: "Run deep pre-flight testing on repo trufoundary-demo"
+    TF->>Agent: Turn 1: Initiate Deep Pre-Flight Verification
+
+    Agent->>MCP: call: setup_sandbox_replica(repo_path="demo-app", sandbox_id="sbx_001")
+    MCP->>Sandbox: Provision container & clone repo
+    Sandbox-->>MCP: { sandbox_id: "sbx_001", status: "READY" }
+    MCP-->>Agent: Sandbox container initialized
+
+    Agent->>MCP: call: seed_sandbox_database(sandbox_id="sbx_001", count=50000)
+    MCP->>Sandbox: Insert 50,000 orders into sandbox DB
+    Sandbox-->>MCP: { seeded_rows: 50000, duration: 0.31s }
+    MCP-->>Agent: Database seeded with real scale
+
+    Agent->>MCP: call: run_sandbox_benchmark(sandbox_id="sbx_001", iterations=20)
+    MCP->>Sandbox: Execute orders query & run EXPLAIN QUERY PLAN
+    Sandbox-->>MCP: { p95_latency_ms: 2340.0, scan_type: "SEQUENTIAL_TABLE_SCAN" }
+    MCP-->>Agent: Benchmark metrics returned
+
+    Agent->>MCP: call: run_red_team_agent(sql_content="...")
+    MCP-->>Agent: { passed: false, error_code: "REDTEAM_DDL_LOCK" }
+
+    Note over Agent,TF: Issue Summary & Choice
+    Agent->>TF: Deliver Diagnostic Report & Ask:<br>"Identified 2,340ms sequential scan. Create fix branch and test in sandbox?"
+    TF-->>Dev: Displays Diagnostic Report & Choice
+
+    Note over Dev,GitHub: Phase 2: Create Fix Branch & Re-Test in Sandbox
+    Dev->>TF: Reply: "Yes, please create branch and test fix in sandbox"
+    TF->>Agent: Turn 2: Authorization to create branch and test
+
+    Agent->>MCP: call: apply_sandbox_fix(sandbox_id="sbx_001", sql="CREATE INDEX CONCURRENTLY IF NOT EXISTS...")
+    MCP->>Sandbox: Apply non-blocking migration in sandbox
+    Sandbox-->>MCP: { applied: true }
+    MCP-->>Agent: Fix applied in sandbox
+
+    Agent->>MCP: call: run_sandbox_benchmark(sandbox_id="sbx_001")
+    MCP->>Sandbox: Re-run benchmark workload on sandbox
+    Sandbox-->>MCP: { p95_ms: 0.298, improvement_pct: 99.98, scan_type: "INDEX_SCAN" }
+    MCP-->>Agent: Re-test verified: 0.298ms!
+
+    Agent->>MCP: call: push_branch_commit(branch_name="fix/orders-index-optimization", ...)
+    MCP->>GitHub: Push branch to origin/fix/orders-index-optimization
+    GitHub-->>MCP: { pushed: true, branch: "fix/orders-index-optimization" }
+    MCP-->>Agent: Branch pushed to GitHub (main is untouched!)
+
+    Agent->>MCP: call: store_repo_memory(repo_id="trufoundary-demo", ...)
+    MCP-->>Agent: { memory_stored: true, case_id: "case_..." }
+
+    Agent-->>TF: "Fix verified in sandbox (2,340ms ➔ 0.298ms). Branch pushed to GitHub. Ready for manual review and merge!"
+    TF-->>Dev: Final verification report displayed
 ```
 
 ---
